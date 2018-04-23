@@ -1,6 +1,8 @@
 #include <iostream>
 #include <map>
 #include <string>
+#include <cmath>
+#include <algorithm>
 
 using namespace std;
 
@@ -11,18 +13,19 @@ const double EPS = 1e-6;
  * 	1-Source Set & its size.
  * 	2-Probabilities.
  * 	3-Message.
- * And returns a tag
+ * And returns a code
  *
  * Decoder works with the following Parameters:
  * 	1-Source Set & its size.
  * 	2-Probabilities.
- * 	3-Tag.
+ * 	3-code.
  * and returns the message
  */
 
 string encode(char*, int, double*, string);
 string decode(char[], int, double[], string);
 string toBinaryString(double);
+double toDecimal(string);
 
 map<char, int> indexOf;
 
@@ -51,7 +54,7 @@ int main() {
 			cin >> input;
 			output = encode(sourceSet, n, probabilities, input);
 		}else{							//Decoding
-			cout << "Enter the Tag to be Decoded: ";
+			cout << "Enter the Code to be Decoded: ";
 			cin >> input;
 			output = decode(sourceSet, n, probabilities, input);
 		}
@@ -92,16 +95,61 @@ string encode(char* sourceSet, int n, double* probabilities, string message){
 	return ret + toBinaryString(0.5);
 }
 
-string decode(char sourceSet[], int n, double probabilities[], string tag){
+string decode(char sourceSet[], int n, double probabilities[], string code){
+	double smallestDifference = 1;
+	double prevl = 0, prevu = 1, l, u, tag;
+	double F[n+1] = {};				//probability density function
+	string ret = "";
+	for(int i = 1 ; i <= n ; ++i) {
+		F[i] = F[i - 1] + probabilities[i];
+		smallestDifference = min(smallestDifference, F[i]-F[i-1]);
+	}
+	int length  = ceil(-log2(smallestDifference));
+	int codeIdx = 0;
 
+	tag = toDecimal(code.substr(codeIdx, length));
+
+	while(1) {
+		int x = 1;
+		for (x = 1; x <= n; ++x) {
+			l = prevl + (prevu - prevl) * F[x - 1];
+			u = prevl + (prevu - prevl) * F[x];
+			if (l <= tag && u >= tag) break;
+		}
+		ret += sourceSet[x];
+		if(tag == 0.5)	break;
+		while (l < 0.5 && u < 0.5 || l > 0.5 && u > 0.5) {    //Rescale
+			++codeIdx;		//Shift by one bit
+			if (u < 0.5) {
+				u *= 2.0;
+				l *= 2.0;
+			}
+			else if (l > 0.5) {
+				u = 2.0 * (u - 0.5);
+				l = 2.0 * (l - 0.5);
+			}
+		}
+		prevl = l;
+		prevu = u;
+		length = min(length, (int)code.length()-codeIdx);
+		tag = toDecimal(code.substr(codeIdx, length));
+	}
+	return ret;
 }
 
-string toBinaryString(double tag){
-	cout << tag << endl;
+string toBinaryString(double tag){		//Tested
 	string ret = "";
 	for(double i = 0.5 ; tag > EPS ; i *= 0.5){
 		if(tag >= i)	ret += '1', tag -= i;
 		else ret += '0';
+	}
+	return ret;
+}
+
+double toDecimal(string code){			//Tested
+	double ret = 0;
+	for(int i = 0 ; i < code.length() ; ++i){
+		ret += (code[i]-'0') * pow(2, -i-1);
 	}
 	return ret;
 }
